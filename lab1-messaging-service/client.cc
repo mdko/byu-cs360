@@ -94,6 +94,8 @@ Client::handle_input() {
         string user = tokens.at(1);
         string index = tokens.at(2);
         request = read_command(user, index);
+    } else if (command.compare("reset") == 0) {
+        request = "reset";
     } else if (command.compare("quit") == 0) {
         exit(0); 
     } else {

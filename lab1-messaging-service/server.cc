@@ -1,10 +1,16 @@
 #include "server.h"
+#include <sstream>
+#include <vector>
+#include <stdexcept>      // std::out_of_range
+
+#define DEBUG true  
 
 Server::Server(int port) {
     // setup variables
     port_ = port;
     buflen_ = 1024;
     buf_ = new char[buflen_+1];
+    message_map_ = new map<string, vector<message> >();
 
     // create and run the server
     create();
@@ -72,47 +78,102 @@ Server::serve() {
 }
 
 string
-Server::store_message(string request) {
-
-}
-
-string
-Server::list_messages(string request) {
-
-}
-
-string
-Server::retrieve_message(string request) {
+Server::store_message(string name, string subject, string length) {
+    string response;
     
+    message msg;
+    msg.subject = subject;
+    msg.contents = "hello";
+
+    map<string, vector<message> >::iterator it = message_map_->find(name);
+    if (it != message_map_->end()) { // key is already present
+        if (DEBUG) cout << "Found user " << name <<", inserting into map" << endl;
+        it->second.push_back(msg);
+    } else {
+        if (DEBUG) cout << "Could not find user " << name << " in map, creating new entry" << endl;
+        vector<message> messages;
+        messages.push_back(msg);
+        message_map_->insert(std::make_pair(name, messages));
+    }
+    return "OK\n";
+}
+
+string
+Server::list_messages(string name) {
+    // if the user isn't stored, return error?
+    // if the user is stored but has no messages, return "list 0"
+    // else return the list
+    map<string, vector<message> >::iterator it = message_map_->find(name);
+    std::ostringstream response;
+    if (it != message_map_->end()) {
+        if (DEBUG) cout << "User " << name << " found, returning list of messages" << endl;
+        vector<message> messages = it->second;
+        int num_mesgs = messages.size();
+        response << "list " << num_mesgs << "\n";
+        for (int i=0; i<num_mesgs; i++) {
+            response << i + 1 << messages.at(i).subject << "\n";
+        }
+    }
+    return response.str();
+}
+
+string
+Server::retrieve_message(string name, string index) {
+    
+}
+
+string
+Server::reset_messages() {
+
 }
 
 string
 Server::handle_request(string request) {
-    int pos = request.find_first_of(" \t");
-    string command = request.substr(0, pos);
-    request.erase(0, pos+1);
-    if (command.compare("put") == 0) {
-        store_message(request);
-        return "";
-    } else if (command.compare("list") == 0) {
-        list_messages(request);
-        return "";   
-    } else if (command.compare("get") == 0) {
-        retrieve_message(request);
-        return "";
-    }
-    return "";
-
     vector<string> tokens;
+    string response = "";
     
-    while (pos != string::npos) {
-        tokens.push_back(line.substr(0, pos));
-        line.erase(0, pos+1);
-        pos = line.find_first_of(" \t");
+    if (request.empty()) {
+        return response;
     }
-    tokens.push_back(line);
+    // Tokenize
+    int pos = request.find_first_of(" ");
+    while (pos != string::npos) {
+        tokens.push_back(request.substr(0, pos));
+        request.erase(0, pos+1);
+        pos = request.find_first_of(" \t");
+    }
+    tokens.push_back(request);
     
-    command = tokens.at(0);
+    try {
+        string command = tokens.at(0);
+        if (command.compare("put") == 0) {
+            if (DEBUG) cout << "put command detected in server" << endl;
+            string name = tokens.at(1);
+            string subject = tokens.at(2);
+            string length = tokens.at(3);
+            response = store_message(name, subject, length);
+        } else if (command.compare("list") == 0) {
+            if (DEBUG) cout << "list command detected in server" << endl;
+            string name = tokens.at(1);
+            response = list_messages(name);
+        } else if (command.compare("get") == 0) {
+            if (DEBUG) cout << "get command detected in server" << endl;
+            string name = tokens.at(1);
+            string index = tokens.at(2);
+            response = retrieve_message(name, index);
+        } else if (command.compare("reset") == 0) {
+            if (DEBUG) cout << "reset command detected in server" << endl;
+            response = reset_messages();
+        } else {
+            perror("INVALID COMMAND FOUND IN SERVER REQUEST");
+            response = "";
+        }
+    } catch (const std::out_of_range& oor) {
+        // not enough arguments provided
+        perror("ERROR HANDLING REQUEST IN SERVER");
+        response = "";
+    }
+    return response;
 }
 
 void
