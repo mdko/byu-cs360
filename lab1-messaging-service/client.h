@@ -26,6 +26,12 @@ private:
     bool send_request(string);
     bool get_response();
 
+    void print_usage(string);
+    bool handle_input();
+    bool send_command(string, string);
+    bool list_command(string);
+    bool read_command(string, string);
+
     int port_;
     string host_;
     int server_;
