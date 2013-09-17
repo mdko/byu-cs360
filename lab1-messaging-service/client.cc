@@ -51,7 +51,8 @@ Client::create() {
     }
 }
 
-void Client::print_usage(string original_string) {
+void
+Client::print_usage(string original_string) {
     cout << "Invalid command/format: \"" << original_string << "\"" << endl;
     cout << "Usage: [command]" << endl;
     cout << "where [command] is one of the following:" << endl;
@@ -61,15 +62,17 @@ void Client::print_usage(string original_string) {
     cout << "\tquit" << endl;
 }
 
-bool Client::handle_input() {
+string
+Client::handle_input() {
     string line, command, original_line;
+    string request = "";
     vector<string> tokens;
     
     // Tokenize
     getline(cin, line);
     original_line = string(line);
     if (line.empty()) {
-        return false;
+        return request;
     }
     int pos = line.find_first_of(" \t");
     while (pos != string::npos) {
@@ -80,56 +83,60 @@ bool Client::handle_input() {
     tokens.push_back(line);
     
     command = tokens.at(0);
-    bool valid = true;
     if (command.compare("send") == 0) {
         string user = tokens.at(1);
         string subject = tokens.at(2);
-        valid = send_command(user, subject);
+        request = send_command(user, subject);
     } else if (command.compare("list") == 0) {
         string user = tokens.at(1);
-        valid = list_command(user);
+        request = list_command(user);
     } else if (command.compare("read") == 0) {
         string user = tokens.at(1);
         string index = tokens.at(2);
-        valid = read_command(user, index);
+        request = read_command(user, index);
     } else if (command.compare("quit") == 0) {
         exit(0); 
     } else {
         print_usage(original_line);
-        valid = false;
     }
-    return valid;
+    return request;
 }
 
-bool Client::send_command(string user, string subject) {
+string
+Client::send_command(string user, string subject) {
     cout << "- Type your message. End with a blank line -" << endl;
 
     string message, curr_line;
     getline(cin, curr_line);
-    while (!curr_line.empty()) {    // want to test this first in case the entire message is blank
-        message += curr_line;       // TODO check if the curr_line is filled with the \n.
-    }
+    while (!curr_line.empty()) {
+        message += curr_line + "\n";
+        getline(cin, curr_line);
+    } 
 
     std::ostringstream ostr;
-    ostr << "put " << user << " " << subject << " " << message.length() <<  "\n" << message;
-    cout << ostr.str() << endl;          
+    ostr << "put " << user << " " << subject << " " << message.length() <<  "\n" << message;   
+    return ostr.str();       
 }
 
-bool Client::list_command(string user) {
-
+string
+Client::list_command(string user) {
+    std::ostringstream ostr;
+    ostr << "list " << user << "\n";
+    return ostr.str();
 }
 
-bool Client::read_command(string user, string index) {
-
+string
+Client::read_command(string user, string index) {
+    std::ostringstream ostr;
+    ostr << "get " << user << " " << index << "\n";
 }
 
 void
 Client::prompt() {
     while (1) {
         cout << "% ";
-        bool valid = handle_input();
-        string request;
-        if (valid) {
+        string request = handle_input();
+        if (!request.empty()) {
             // send request
             bool success = send_request(request);
             // break if an error occurred

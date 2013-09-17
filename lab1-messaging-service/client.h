@@ -27,10 +27,10 @@ private:
     bool get_response();
 
     void print_usage(string);
-    bool handle_input();
-    bool send_command(string, string);
-    bool list_command(string);
-    bool read_command(string, string);
+    string handle_input();
+    string send_command(string, string);
+    string list_command(string);
+    string read_command(string, string);
 
     int port_;
     string host_;

@@ -71,6 +71,50 @@ Server::serve() {
 
 }
 
+string
+Server::store_message(string request) {
+
+}
+
+string
+Server::list_messages(string request) {
+
+}
+
+string
+Server::retrieve_message(string request) {
+    
+}
+
+string
+Server::handle_request(string request) {
+    int pos = request.find_first_of(" \t");
+    string command = request.substr(0, pos);
+    request.erase(0, pos+1);
+    if (command.compare("put") == 0) {
+        store_message(request);
+        return "";
+    } else if (command.compare("list") == 0) {
+        list_messages(request);
+        return "";   
+    } else if (command.compare("get") == 0) {
+        retrieve_message(request);
+        return "";
+    }
+    return "";
+
+    vector<string> tokens;
+    
+    while (pos != string::npos) {
+        tokens.push_back(line.substr(0, pos));
+        line.erase(0, pos+1);
+        pos = line.find_first_of(" \t");
+    }
+    tokens.push_back(line);
+    
+    command = tokens.at(0);
+}
+
 void
 Server::handle(int client) {
     // loop to handle all requests
@@ -80,8 +124,9 @@ Server::handle(int client) {
         // break if client is done or an error occurred
         if (request.empty())
             break;
+        string response = handle_request(request);
         // send response
-        bool success = send_response(client,request);
+        bool success = send_response(client,response);
         // break if an error occurred
         if (not success)
             break;

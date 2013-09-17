@@ -23,6 +23,7 @@ private:
     void handle(int);
     string get_request(int);
     bool send_response(int, string);
+    string handle_request(string);
 
     int port_;
     int server_;
