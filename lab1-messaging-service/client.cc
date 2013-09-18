@@ -95,7 +95,7 @@ Client::handle_input() {
         string index = tokens.at(2);
         request = read_command(user, index);
     } else if (command.compare("reset") == 0) {
-        request = "reset";
+        request = "reset\n";
     } else if (command.compare("quit") == 0) {
         exit(0); 
     } else {
@@ -131,6 +131,7 @@ string
 Client::read_command(string user, string index) {
     std::ostringstream ostr;
     ostr << "get " << user << " " << index << "\n";
+    return ostr.str();
 }
 
 void
@@ -140,6 +141,7 @@ Client::prompt() {
         string request = handle_input();
         if (!request.empty()) {
             // send request
+            if (DEBUG) cout << "client is sending the following to the server: " << request << endl;
             bool success = send_request(request);
             // break if an error occurred
             if (not success) {

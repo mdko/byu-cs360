@@ -32,6 +32,7 @@ private:
     string list_messages(string);
     string retrieve_message(string, string);
     string reset_messages();
+    string receive_message(int);
 
     int port_;
     int server_;

@@ -110,4 +110,13 @@ server.o server.d : server.cc server.h /usr/include/arpa/inet.h \
  /usr/include/c++/4.7/bits/basic_ios.tcc \
  /usr/include/c++/4.7/bits/ostream.tcc /usr/include/c++/4.7/istream \
  /usr/include/c++/4.7/bits/istream.tcc /usr/include/c++/4.7/sstream \
- /usr/include/c++/4.7/bits/sstream.tcc /usr/include/c++/4.7/stdexcept
+ /usr/include/c++/4.7/bits/sstream.tcc /usr/include/c++/4.7/stdexcept \
+ /usr/include/c++/4.7/climits \
+ /usr/lib/gcc/i686-linux-gnu/4.7/include-fixed/limits.h \
+ /usr/lib/gcc/i686-linux-gnu/4.7/include-fixed/syslimits.h \
+ /usr/include/limits.h /usr/include/i386-linux-gnu/bits/posix1_lim.h \
+ /usr/include/i386-linux-gnu/bits/local_lim.h /usr/include/linux/limits.h \
+ /usr/include/i386-linux-gnu/bits/posix2_lim.h \
+ /usr/include/i386-linux-gnu/bits/xopen_lim.h \
+ /usr/include/c++/4.7/iterator \
+ /usr/include/c++/4.7/bits/stream_iterator.h

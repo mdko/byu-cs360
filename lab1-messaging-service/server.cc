@@ -2,6 +2,8 @@
 #include <sstream>
 #include <vector>
 #include <stdexcept>      // std::out_of_range
+#include <climits>
+#include <iterator>
 
 #define DEBUG true  
 
@@ -78,53 +80,117 @@ Server::serve() {
 }
 
 string
+Server::receive_message(int length) {
+    string message = "";
+    // read until we get a newline
+    while (message.find("\n") == string::npos) {
+        int nread = recv(client,buf_,1024,0);
+        if (nread < 0) {
+            if (errno == EINTR)
+                // the socket call was interrupted -- try again
+                continue;
+            else
+                // an error occurred, so break out
+                return "";
+        } else if (nread == 0) {
+            // the socket is closed
+            return "";
+        }
+        // be sure to use append in case we have binary data
+        request.append(buf_,nread);
+    }
+    // a better server would cut off anything after the newline and
+    // save it in a cache
+    return request;
+}
+
+string
 Server::store_message(string name, string subject, string length) {
+    if (DEBUG) cout << "entering store_message method" << endl;
     string response;
-    
     message msg;
     msg.subject = subject;
-    msg.contents = "hello";
 
-    map<string, vector<message> >::iterator it = message_map_->find(name);
-    if (it != message_map_->end()) { // key is already present
-        if (DEBUG) cout << "Found user " << name <<", inserting into map" << endl;
-        it->second.push_back(msg);
+    int length_i = strtol(length.c_str(), NULL, 10);
+    if (length_i == 0L || length_i == LONG_MAX || length_i == LONG_MIN) {
+        response << "error index "  << index << " is malformed\n";
     } else {
-        if (DEBUG) cout << "Could not find user " << name << " in map, creating new entry" << endl;
-        vector<message> messages;
-        messages.push_back(msg);
-        message_map_->insert(std::make_pair(name, messages));
+        msg.contents = receive_message(length_i);
+        
+        map<string, vector<message> >::iterator it = message_map_->find(name);
+        if (it != message_map_->end()) { // key is already present
+            if (DEBUG) cout << "found user " << name <<", inserting into map" << endl;
+            it->second.push_back(msg);
+        } else {
+            if (DEBUG) cout << "could not find user " << name << " in map, creating new entry" << endl;
+            vector<message> messages;
+            messages.push_back(msg);
+            message_map_->insert(std::make_pair(name, messages));
+        }
+        response = "OK\n";
     }
-    return "OK\n";
+    if (DEBUG) cout << "returning from store_message method" << endl;
+    return response.str();
 }
 
 string
 Server::list_messages(string name) {
-    // if the user isn't stored, return error?
-    // if the user is stored but has no messages, return "list 0"
-    // else return the list
+    if (DEBUG) cout << "entering list_messages method" << endl;
     map<string, vector<message> >::iterator it = message_map_->find(name);
     std::ostringstream response;
     if (it != message_map_->end()) {
-        if (DEBUG) cout << "User " << name << " found, returning list of messages" << endl;
+        if (DEBUG) cout << "user " << name << " found, returning list of messages" << endl;
         vector<message> messages = it->second;
         int num_mesgs = messages.size();
         response << "list " << num_mesgs << "\n";
         for (int i=0; i<num_mesgs; i++) {
-            response << i + 1 << messages.at(i).subject << "\n";
+            response << i + 1 << " " << messages.at(i).subject << "\n";
         }
+    } else {
+        response << "error user " << name << " not found\n";
     }
+    if (DEBUG) cout << "returning from list_messages method" << endl;
     return response.str();
 }
 
 string
 Server::retrieve_message(string name, string index) {
-    
+    if (DEBUG) cout << "entering retrieve_message method" << endl;
+    map<string, vector<message> >::iterator it = message_map_->find(name);
+    std::ostringstream response;
+    try {
+        if (it != message_map_->end()) {
+            vector<message> messages = it->second;
+            int index_i = strtol(index.c_str(), NULL, 10);
+            if (index_i == 0L || index_i == LONG_MAX || index_i == LONG_MIN) {
+                response << "error index "  << index << " is malformed\n";
+            } else {
+                if (DEBUG) cout << "retrieving message " << index_i << " for " << name << endl;
+                message msg = messages.at(index_i - 1);
+                string subject = msg.subject;
+                string contents = msg.contents;
+                response << "message " << subject << " " << contents.size() << "\n" << contents;
+            }
+        } else {
+            response << "error user " << name << " not found\n";
+        }
+    } catch (const std::out_of_range& oor) {
+        response << "error no message at that index for " << name << "\n";
+    }
+    if (DEBUG) cout << "returning from retrieve_message method" << endl;
+    return response.str();
 }
 
 string
 Server::reset_messages() {
-
+    if (DEBUG) cout << "entering reset_messages method" << endl;
+    map<string, vector<message> >::iterator it = message_map_->begin();
+    while (it != message_map_->end()) {
+        it->second.clear();
+        advance(it,1);
+    }
+    if (DEBUG) cout << "returning from reset_messages method" << endl;
+    return "OK\n";
 }
 
 string
@@ -141,6 +207,10 @@ Server::handle_request(string request) {
         tokens.push_back(request.substr(0, pos));
         request.erase(0, pos+1);
         pos = request.find_first_of(" \t");
+    }
+    pos = request.find_first_of("\n");
+    if (pos != string::npos) {
+        request.erase(pos,1);
     }
     tokens.push_back(request);
     
@@ -165,13 +235,11 @@ Server::handle_request(string request) {
             if (DEBUG) cout << "reset command detected in server" << endl;
             response = reset_messages();
         } else {
-            perror("INVALID COMMAND FOUND IN SERVER REQUEST");
-            response = "";
+            response = "error invalid command received in server";
         }
     } catch (const std::out_of_range& oor) {
         // not enough arguments provided
-        perror("ERROR HANDLING REQUEST IN SERVER");
-        response = "";
+        response = "error handling request in server -- to few arguments";
     }
     return response;
 }
@@ -182,11 +250,14 @@ Server::handle(int client) {
     while (1) {
         // get a request
         string request = get_request(client);
+        if (DEBUG) cout << "server received the following request from the client: " << request << endl;
         // break if client is done or an error occurred
         if (request.empty())
             break;
         string response = handle_request(request);
         // send response
+
+        if (DEBUG) cout << "server is sending the follwing response to the client: " << response << endl;
         bool success = send_response(client,response);
         // break if an error occurred
         if (not success)
