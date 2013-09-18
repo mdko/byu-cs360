@@ -14,19 +14,23 @@ main(int argc, char **argv)
 
     // setup default arguments
     port = 3000;
+    bool debug = false;
 
     // process command line options using getopt()
     // see "man 3 getopt"
-    while ((option = getopt(argc,argv,"p:")) != -1) {
+    while ((option = getopt(argc,argv,"d:p:")) != -1) {
         switch (option) {
             case 'p':
                 port = atoi(optarg);
                 break;
+            case 'd':
+                debug = true;
+                break;
             default:
-                cout << "server [-p port]" << endl;
+                cout << "server [-p port] [-d]" << endl;
                 exit(EXIT_FAILURE);
         }
     }
 
-    Server server = Server(port);
+    Server server = Server(port, debug);
 }

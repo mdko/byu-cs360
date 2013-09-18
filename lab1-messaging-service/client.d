@@ -114,4 +114,11 @@ client.o client.d : client.cc client.h /usr/include/arpa/inet.h \
  /usr/include/c++/4.7/bits/stl_uninitialized.h \
  /usr/include/c++/4.7/bits/stl_vector.h \
  /usr/include/c++/4.7/bits/stl_bvector.h \
- /usr/include/c++/4.7/bits/vector.tcc
+ /usr/include/c++/4.7/bits/vector.tcc /usr/include/c++/4.7/stdexcept \
+ /usr/include/c++/4.7/climits \
+ /usr/lib/gcc/i686-linux-gnu/4.7/include-fixed/limits.h \
+ /usr/lib/gcc/i686-linux-gnu/4.7/include-fixed/syslimits.h \
+ /usr/include/limits.h /usr/include/i386-linux-gnu/bits/posix1_lim.h \
+ /usr/include/i386-linux-gnu/bits/local_lim.h /usr/include/linux/limits.h \
+ /usr/include/i386-linux-gnu/bits/posix2_lim.h \
+ /usr/include/i386-linux-gnu/bits/xopen_lim.h

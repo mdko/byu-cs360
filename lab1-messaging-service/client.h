@@ -16,7 +16,7 @@ using namespace std;
 
 class Client {
 public:
-    Client(string, int);
+    Client(string, int, bool);
     ~Client();
 
 private:
@@ -31,10 +31,15 @@ private:
     string send_command(string, string);
     string list_command(string);
     string read_command(string, string);
+    string format_and_output_response(string);
+    string receive_message(int);
+    string receive_list();
 
     int port_;
     string host_;
     int server_;
     int buflen_;
     char* buf_;
+    string cache_;
+    bool debug_;
 };
