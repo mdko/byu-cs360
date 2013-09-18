@@ -105,6 +105,16 @@ Server::receive_message(int client, int length) {
         if (debug_) cout << "message " << message << endl;
         count += nread;
     }
+
+    int pos_mes = message.find_first_of("\n");
+    if (pos_mes != string::npos) {
+        message.erase(pos_mes,1);
+    }
+
+    pos_mes = message.find_last_of("\n");
+    if (pos_mes != string::npos && pos_mes == message.length() - 1) {
+        message.erase(pos_mes, 1);
+    }
     if (debug_) cout << "returning from receive_message method" << endl;
     return message;
 }
@@ -240,11 +250,11 @@ Server::handle_request(int client, string request) {
             if (debug_) cout << "reset command detected in server" << endl;
             response = reset_messages();
         } else {
-            response = "error invalid command received in server";
+            response = "error invalid command received in server\n";
         }
     } catch (const std::out_of_range& oor) {
         // not enough arguments provided
-        response = "error handling request in server -- to few arguments";
+        response = "error handling request in server -- to few arguments\n";
     }
     return response;
 }
@@ -262,7 +272,7 @@ Server::handle(int client) {
         string response = handle_request(client, request);
         
         // send response
-        if (debug_) cout << "server is sending the follwing response to the client: \"" << response << "\"" << endl;
+        if (debug_) cout << "server is sending the following response to the client: \"" << response << "\"" << endl;
         bool success = send_response(client,response);
         // break if an error occurred
         if (not success)

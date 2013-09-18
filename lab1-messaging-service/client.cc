@@ -54,8 +54,8 @@ Client::create() {
 
 void
 Client::print_usage(string original_string) {
-    cout << "Invalid command/format: \"" << original_string << "\"" << endl;
-    cout << "Usage: [command]" << endl;
+    cout << "error invalid command/format: \"" << original_string << "\"" << endl;
+    cout << "usage: [command]" << endl;
     cout << "where [command] is one of the following:" << endl;
     cout << "\tsend [user] [subject]" << endl;
     cout << "\tlist [user]" << endl;
@@ -169,7 +169,7 @@ Client::format_and_output_response(string response) {
             if (number == 0L || number == LONG_MAX || number == LONG_MIN) {
                 resp << "error coudldn't parse the number field in the list returned from the server\n";
             } else {
-                resp << receive_list();
+                resp << receive_list() << "\n";
                 // for (int i = 0; i < number; i += 2) {
                 //     resp << tokens.at(2 + i) << " " << tokens.at(3 + i) << "\n";
                 // }
@@ -182,7 +182,7 @@ Client::format_and_output_response(string response) {
                 resp << "error coudldn't parse the length field in the message returned from the server\n";
             }
             else {
-                resp << receive_message(length);
+                resp << receive_message(length) << "\n";
             }
         } else if (resp_command.compare("error") == 0) { 
             resp << original_response;
@@ -250,16 +250,16 @@ Client::receive_message(int length) {
         if (debug_) cout << "message " << message << endl;
         count += nread;
     }
-    if (debug_) cout << "returning from receive_message method" << endl;
 
-    // remove 2 preceeding newlines
+    // remove 1 preceeding newlines
     int pos = message.find_first_of("\n");
-    message.erase(pos,1);
-    pos = message.find_first_of("\n");
     message.erase(pos,1);
     // and 1 trailing newline
     pos = message.find_last_of("\n");
-    message.erase(pos,1);
+    if (pos != string::npos && pos == message.length()-1)
+        message.erase(pos,1);
+
+    if (debug_) cout << "returning from receive_message method with " << message << endl;
     return message;
 }
 
@@ -345,6 +345,6 @@ Client::get_response() {
     // int pos = response.find_last_of("\n");
     // if (pos != string::npos && pos == (response.length() - 1))
     //     response.erase(pos, 1);
-    cout << response << endl;
+    cout << response;
     return true;
 }
