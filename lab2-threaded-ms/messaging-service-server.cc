@@ -31,6 +31,6 @@ main(int argc, char **argv)
                 exit(EXIT_FAILURE);
         }
     }
-
+    if (debug) cout << "Starting main" << endl;
     Server server = Server(port, debug);
 }

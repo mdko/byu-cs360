@@ -1,0 +1,45 @@
+I used the following data structures for synchronization:
+
+4 semaphores:
+
+	*********************************************************************
+	
+	In the producer-consumer problem, this would be n, which
+	coordinates when the queue is empty.
+	For usage, see:
+		struct-defs.h:28 	--	where this shared semaphore is stored, in a
+								struct so I can pass it as a void pointer
+								to thread run functions
+		server.cc:21 		-- 	initializing the semaphore
+		server.cc:70 		-- 	producer signalling to waiting threads that a 
+								client has been added to the shared queue
+		server.cc:87 		-- 	consumer waiting for the producer to signal
+								that a client has been added to the queue
+	
+	sem_t num_clients_in_queue_;
+
+	*********************************************************************
+
+	In the producer-consumer problem, this would be e, which 
+	coordinates when there is enough room in queue to put stuff in.
+	For usage, see:
+		struct-defs.h:29 	--	where this shared semaphore is stored, in a
+								struct so I can pass it as a void pointer
+								to thread run functions
+		server.cc:22 		-- initializing this semaphore
+				
+    sem_t empty_spots_in_queue_; 
+    
+    // In the producer-consumer problem, this would be s, which
+    // controls access to critial section. In my code, the critical section
+    // this is used for is accessing (pushing and popping) clients from the
+    // queue as they request from the server or can be handled, respectively.
+    sem_t client_queue_lock_;    
+
+    // This is used to control access to critical sections that
+    // deal with the message map that the server threads need to access
+    // to store or retrieve messages.
+    sem_t message_map_lock_;
+
+Multiple thread creations:
+

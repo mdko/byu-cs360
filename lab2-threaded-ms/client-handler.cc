@@ -11,6 +11,7 @@ Client_Handler::Client_Handler(int client, map<string, vector<message> >* messag
     client_ = client;
 	message_map_ = messages;
 	messages_lock_ = message_sem;
+	debug_ = false;
 }
 
 Client_Handler::~Client_Handler() {
@@ -19,6 +20,7 @@ Client_Handler::~Client_Handler() {
 
 void 
 Client_Handler::handle_client() {
+	if (debug_) cout << "handling client in client-handler" << endl;
 	handle(client_);
 }
 

@@ -21,9 +21,10 @@ typedef struct msg {
     string contents;
 } message;
 
-struct worker_data {
+struct data {
     queue<int>* client_queue;
     map<string, vector<message> >* messages;
+    int server;
     sem_t num_clients_in_queue;
     sem_t empty_spots_in_queue;
     sem_t client_queue_lock;

@@ -7,58 +7,88 @@
 #include <iterator>
 
 void *work(void *);
+void *serve(void *);
 void *handle_client(void *);
 
 Server::Server(int port, bool debug) {
     // setup variables
     port_ = port;
-    max_num_threads_ = 10;
+    max_num_threads_ = 100;
     debug_ = debug;
 
-    struct worker_data wd;
+    struct data wd;
     // create semaphores and data structures, store in struct for passing
-    sem_init(&num_clients_in_queue_, 0, 0);
-    sem_init(&empty_spots_in_queue_, 0, max_num_threads_);
-    sem_init(&client_queue_lock_, 0, 1);
-    sem_init(&message_map_lock_, 0, 1);
-    wd.num_clients_in_queue = num_clients_in_queue_;
-    wd.empty_spots_in_queue = empty_spots_in_queue_;
-    wd.client_queue_lock = client_queue_lock_;
-    wd.message_map_lock = message_map_lock_;
+    sem_init(&wd.num_clients_in_queue, 0, 0);
+    sem_init(&wd.empty_spots_in_queue, 0, max_num_threads_);
+    sem_init(&wd.client_queue_lock, 0, 1);
+    sem_init(&wd.message_map_lock, 0, 1);
     // create shared queue (vector of integers)
-    client_queue_ = new queue<int>();
-    wd.client_queue = client_queue_;
+    wd.client_queue = new queue<int>();
     // create message storage
-    message_map_ = new map<string, vector<message> >();
-    wd.messages = message_map_;
+    wd.messages = new map<string, vector<message> >();
 
+    if (debug_) cout << "Creating the server" << endl;
+    // create the server
+    create();
+    wd.server = server_;
+
+    if (debug_) cout << "Creating thread to handle the distribution of clients" << endl;
     // create worker thread that handles clients, pass in shared stuff
     pthread_t worker;
     pthread_create(&worker, NULL, &work, &wd);
-    pthread_join(worker, NULL);
 
-    // create the server
-    create();
     // run the server
-    serve();
+    if (debug_) cout << "Running the server" << endl;
+    pthread_t server;
+    pthread_create(&server, NULL, &serve, &wd);
+
+    pthread_join(worker, NULL);
+    pthread_join(server, NULL);
 }
 
 Server::~Server() {
-    delete client_queue_;
-    delete message_map_;
+}
+
+//producer
+void *
+serve(void *vptr) {
+    struct data* wd;
+    wd = (struct data*) vptr;
+
+    int client;
+    struct sockaddr_in client_addr;
+    socklen_t clientlen = sizeof(client_addr);
+    //cout << "Serving" << endl;
+
+      // accept clients
+    while ((client = accept(wd->server,(struct sockaddr *)&client_addr,&clientlen)) > 0) {
+        //cout << "Accepting a client" << endl;
+        sem_wait(&wd->empty_spots_in_queue);
+        sem_wait(&wd->client_queue_lock);
+        wd->client_queue->push(client);
+        sem_post(&wd->client_queue_lock);
+        sem_post(&wd->num_clients_in_queue);
+        //cout << "End of accept loop" << endl;
+    }
+    
+    close(wd->server);
 }
 
 //Consumer
 void *
 work(void *vptr) {
-    struct worker_data* wd;
-    wd = (struct worker_data*) vptr;
+    struct data* wd;
+    wd = (struct data*) vptr;
     int client;
 
     while (true) {
+        //cout << "Start of consumer while loop" << endl;
         // take client from queue
         sem_wait(&wd->num_clients_in_queue);
+        //cout << "Done waiting for something in queue" << endl;
         sem_wait(&wd->client_queue_lock);
+        //cout << "Taking client from the queue" << endl;
+
         client = wd->client_queue->front();
         wd->client_queue->pop();
         sem_post(&wd->client_queue_lock);
@@ -72,6 +102,7 @@ work(void *vptr) {
         pthread_t client_handler;
         pthread_create(&client_handler, NULL, &handle_client, &cdata);
         pthread_join(client_handler, NULL);
+        //cout << "End of consumer while loop" << endl;
     }
 }
 
@@ -80,6 +111,7 @@ handle_client(void *vptr) {
     struct client_data* cd;
     cd = (struct client_data*) vptr;
 
+    //cout << "Calling client_handler" << endl;
     Client_Handler ch = Client_Handler(cd->client, cd->messages, cd->message_sem);
     ch.handle_client();
 }
@@ -120,27 +152,4 @@ Server::create() {
         perror("listen");
         exit(-1);
     }
-}
-
-//producer
-void
-Server::serve() {
-    // setup client
-    int client;
-    struct sockaddr_in client_addr;
-    socklen_t clientlen = sizeof(client_addr);
-    if (debug_) cout << "Serving" << endl;
-
-      // accept clients
-    while ((client = accept(server_,(struct sockaddr *)&client_addr,&clientlen)) > 0) {
-        if (debug_) cout << "Accepting a client" << endl;
-        sem_wait(&empty_spots_in_queue_);
-        sem_wait(&client_queue_lock_);
-        client_queue_->push(client);
-        sem_post(&client_queue_lock_);
-        sem_post(&num_clients_in_queue_);
-    }
-    
-    close(server_);
-
 }
