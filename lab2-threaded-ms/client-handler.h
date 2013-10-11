@@ -18,7 +18,7 @@ using namespace std;
 
 class Client_Handler {
 public:
-    Client_Handler(int, map<string, vector<message> >*, sem_t&);
+    Client_Handler(int, map<string, vector<message> >*, sem_t*);
     ~Client_Handler();
 
     void handle_client();
@@ -36,7 +36,7 @@ private:
     string receive_message(int, int);
 
 	int client_;
-	sem_t messages_lock_;
+	sem_t* messages_lock_;
 	map<string, vector<message> >* message_map_;
     char* buf_;
     int buflen_;

@@ -1,3 +1,6 @@
+Run with "make".
+The server is entitled "msgd".
+
 I used the following data structures for synchronization:
 
 4 semaphores:
@@ -10,36 +13,78 @@ I used the following data structures for synchronization:
 		struct-defs.h:28 	--	where this shared semaphore is stored, in a
 								struct so I can pass it as a void pointer
 								to thread run functions
-		server.cc:21 		-- 	initializing the semaphore
-		server.cc:70 		-- 	producer signalling to waiting threads that a 
+		server.cc:22 		-- 	initializing the semaphore
+		server.cc:68 		-- 	producer signalling to waiting threads that a 
 								client has been added to the shared queue
-		server.cc:87 		-- 	consumer waiting for the producer to signal
+		server.cc:84 		-- 	consumer waiting for the producer to signal
 								that a client has been added to the queue
 	
-	sem_t num_clients_in_queue_;
+	sem_t num_clients_in_queue;
 
 	*********************************************************************
 
-	In the producer-consumer problem, this would be e, which 
-	coordinates when there is enough room in queue to put stuff in.
+	Coordinates if there are spots available in the buffer to store the clients
+	that are being accepted. In the producer-consumer problem, this would be e,
+	saying how many spots are open in the queue.
+
 	For usage, see:
 		struct-defs.h:29 	--	where this shared semaphore is stored, in a
 								struct so I can pass it as a void pointer
-								to thread run functions
-		server.cc:22 		-- initializing this semaphore
-				
-    sem_t empty_spots_in_queue_; 
-    
-    // In the producer-consumer problem, this would be s, which
-    // controls access to critial section. In my code, the critical section
-    // this is used for is accessing (pushing and popping) clients from the
-    // queue as they request from the server or can be handled, respectively.
+		server.cc:23 		-- 	initializing this semaphore
+		server.cc:64		--	waiting for there to be an available spot
+								in the queue. This is how I limit the 
+								number of clients in the queue so it doesn't
+								exceed some arbitrary number (100 here)
+		server.cc:90		-- 	where I signal that the client has been removed
+								from the queue so the producer can store another one
+
+    sem_t empty_spots_in_client_queue; 
+
+	*********************************************************************
+
+    In the producer-consumer problem, this would be s, which
+    controls access to critial section. In my code, the 
+    critical section is where this is used for is accessing 
+    (pushing and popping) clients from the queue as they 
+    request from the server or can be handled, respectively.
+    For usages see:
+    	struct-defs.h:30	--	where this shared semaphore is stored, in a
+								struct so I can pass it as a void pointer
+    	server.cc:23		-- 	initialization
+    	server.cc:65		-- 	wait until the critical section is
+    							clear so I can add something to queue
+    	server.cc:67		-- 	signal that I am leaving the critical
+    							section
+    	server.cc:85		--	wait until critical section is clear
+    							so I can retrieve whatever is queue
+    	server.cc:89		--	signal being done with critical
+    							section
+
     sem_t client_queue_lock_;    
 
-    // This is used to control access to critical sections that
-    // deal with the message map that the server threads need to access
-    // to store or retrieve messages.
+    *********************************************************************
+
+    This is used to control access to critical sections that
+    deal with the message map that the server threads need to access
+    to store or retrieve messages.
+    For usages see:
+    	struct-defs.h:31	-- 	where this shared semaphore is stored, in a
+								struct so I can pass it as a void pointer
+		server.cc:25-27		-- 	initialization
+		client-handler.cc: 80, 101, 123, 153
+							--	waiting for access to the shared map
+								of messages
+		client-handler.cc: 91, 115, 145, 159
+							--	signalling to other threads that I am
+								out of the critical section
+
+
     sem_t message_map_lock_;
 
 Multiple thread creations:
+	server.cc: 38 -- 10 worker threads created
+	server.cc: 43 -- thread to accept clients
+
+Shared data structures:
+	struct-defs:25-26 (and used in association with the semaphores listed above)
 

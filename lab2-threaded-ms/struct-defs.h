@@ -26,15 +26,9 @@ struct data {
     map<string, vector<message> >* messages;
     int server;
     sem_t num_clients_in_queue;
-    sem_t empty_spots_in_queue;
+    sem_t empty_spots_in_client_queue;
     sem_t client_queue_lock;
-    sem_t message_map_lock;
-};
-
-struct client_data {
-    int client;
-    map<string, vector<message> >* messages;
-    sem_t message_sem;
+    sem_t* message_map_lock;
 };
 
 #endif

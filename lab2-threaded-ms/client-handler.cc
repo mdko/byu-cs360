@@ -4,7 +4,7 @@
 #include <stdexcept>      // std::out_of_range  
 #include <climits>
 
-Client_Handler::Client_Handler(int client, map<string, vector<message> >* messages, sem_t& message_sem) {
+Client_Handler::Client_Handler(int client, map<string, vector<message> >* messages, sem_t* message_sem) {
     buflen_ = 1024;
     buf_ = new char[buflen_+1];
     cache_ = "";
@@ -77,7 +77,7 @@ Client_Handler::store_message(int client, string name, string subject, string le
     } else {
         msg.contents = receive_message(client, length_i);
         
-        sem_wait(&messages_lock_);
+        sem_wait(messages_lock_);
         map<string, vector<message> >::iterator it = message_map_->find(name);
         if (it != message_map_->end()) { // key is already present
             if (debug_) cout << "found user " << name <<", inserting into map" << endl;
@@ -88,7 +88,7 @@ Client_Handler::store_message(int client, string name, string subject, string le
             messages.push_back(msg);
             message_map_->insert(std::make_pair(name, messages));
         }
-        sem_post(&messages_lock_);
+        sem_post(messages_lock_);
         response << "OK\n";
     }
     if (debug_) cout << "returning from store_message method" << endl;
@@ -98,7 +98,7 @@ Client_Handler::store_message(int client, string name, string subject, string le
 string
 Client_Handler::list_messages(string name) {
     if (debug_) cout << "entering list_messages method" << endl;
-    sem_wait(&messages_lock_);
+    sem_wait(messages_lock_);
     map<string, vector<message> >::iterator it = message_map_->find(name);
     std::ostringstream response;
     if (it != message_map_->end()) {
@@ -112,7 +112,7 @@ Client_Handler::list_messages(string name) {
     } else {
         response << "error user " << name << " not found\n";
     }
-    sem_post(&messages_lock_);
+    sem_post(messages_lock_);
     if (debug_) cout << "returning from list_messages method" << endl;
     return response.str();
 }
@@ -120,7 +120,7 @@ Client_Handler::list_messages(string name) {
 string
 Client_Handler::retrieve_message(string name, string index) {
     if (debug_) cout << "entering retrieve_message method" << endl;
-    sem_wait(&messages_lock_);
+    sem_wait(messages_lock_);
     map<string, vector<message> >::iterator it = message_map_->find(name);
     std::ostringstream response;
     try {
@@ -142,7 +142,7 @@ Client_Handler::retrieve_message(string name, string index) {
     } catch (const std::out_of_range& oor) {
         response << "error no message at that index for " << name << "\n";
     }
-    sem_post(&messages_lock_);
+    sem_post(messages_lock_);
     if (debug_) cout << "returning from retrieve_message method" << endl;
     return response.str();
 }
@@ -150,13 +150,13 @@ Client_Handler::retrieve_message(string name, string index) {
 string
 Client_Handler::reset_messages() {
     if (debug_) cout << "entering reset_messages method" << endl;
-    sem_wait(&messages_lock_);
+    sem_wait(messages_lock_);
     map<string, vector<message> >::iterator it = message_map_->begin();
     while (it != message_map_->end()) {
         it->second.clear();
         advance(it,1);
     }
-    sem_post(&messages_lock_);
+    sem_post(messages_lock_);
     if (debug_) cout << "returning from reset_messages method" << endl;
     return "OK\n";
 }

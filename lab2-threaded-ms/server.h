@@ -28,6 +28,7 @@ private:
 
     int port_;
     int server_;
-    int max_num_threads_;
+    int num_threads_;
+    int client_queue_size_;
     bool debug_;
 };

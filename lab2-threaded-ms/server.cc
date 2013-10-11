@@ -13,36 +13,39 @@ void *handle_client(void *);
 Server::Server(int port, bool debug) {
     // setup variables
     port_ = port;
-    max_num_threads_ = 100;
+    num_threads_ = 10;
+    client_queue_size_ = 100;
     debug_ = debug;
 
     struct data wd;
     // create semaphores and data structures, store in struct for passing
     sem_init(&wd.num_clients_in_queue, 0, 0);
-    sem_init(&wd.empty_spots_in_queue, 0, max_num_threads_);
+    sem_init(&wd.empty_spots_in_client_queue, 0, client_queue_size_);
     sem_init(&wd.client_queue_lock, 0, 1);
-    sem_init(&wd.message_map_lock, 0, 1);
+    sem_t * mml = new sem_t;
+    sem_init(mml, 0, 1);
+    wd.message_map_lock = mml;
     // create shared queue (vector of integers)
     wd.client_queue = new queue<int>();
     // create message storage
     wd.messages = new map<string, vector<message> >();
 
-    if (debug_) cout << "Creating the server" << endl;
     // create the server
     create();
     wd.server = server_;
 
-    if (debug_) cout << "Creating thread to handle the distribution of clients" << endl;
-    // create worker thread that handles clients, pass in shared stuff
-    pthread_t worker;
-    pthread_create(&worker, NULL, &work, &wd);
+    // Call this ten times to create 10 worker threads that handle clients, passing in shared stuff
+    for (int i = 0; i < num_threads_; i++) {
+        pthread_t worker;
+        pthread_create(&worker, NULL, &work, &wd);
+    }
 
-    // run the server
-    if (debug_) cout << "Running the server" << endl;
+    // run the server (not a necessary thread, but I did this in case there was something
+    // else I wanted to do after creating a thread to serve)
     pthread_t server;
     pthread_create(&server, NULL, &serve, &wd);
 
-    pthread_join(worker, NULL);
+    //pthread_join-ing on the workers is unnecessary here since we're ending the program here
     pthread_join(server, NULL);
 }
 
@@ -58,17 +61,14 @@ serve(void *vptr) {
     int client;
     struct sockaddr_in client_addr;
     socklen_t clientlen = sizeof(client_addr);
-    //cout << "Serving" << endl;
 
       // accept clients
     while ((client = accept(wd->server,(struct sockaddr *)&client_addr,&clientlen)) > 0) {
-        //cout << "Accepting a client" << endl;
-        sem_wait(&wd->empty_spots_in_queue);
+        sem_wait(&wd->empty_spots_in_client_queue);  // if using a finite buffer for client storage
         sem_wait(&wd->client_queue_lock);
         wd->client_queue->push(client);
         sem_post(&wd->client_queue_lock);
         sem_post(&wd->num_clients_in_queue);
-        //cout << "End of accept loop" << endl;
     }
     
     close(wd->server);
@@ -82,38 +82,20 @@ work(void *vptr) {
     int client;
 
     while (true) {
-        //cout << "Start of consumer while loop" << endl;
+
         // take client from queue
         sem_wait(&wd->num_clients_in_queue);
-        //cout << "Done waiting for something in queue" << endl;
         sem_wait(&wd->client_queue_lock);
-        //cout << "Taking client from the queue" << endl;
 
         client = wd->client_queue->front();
         wd->client_queue->pop();
         sem_post(&wd->client_queue_lock);
-        sem_post(&wd->empty_spots_in_queue);
+        sem_post(&wd->empty_spots_in_client_queue);  // using a finite buffer for client storage
 
-        // handle it -- create a client_handler thread
-        struct client_data cdata;
-        cdata.client = client;
-        cdata.messages = wd->messages;
-        cdata.message_sem = wd->message_map_lock;
-        pthread_t client_handler;
-        pthread_create(&client_handler, NULL, &handle_client, &cdata);
-        pthread_join(client_handler, NULL);
-        //cout << "End of consumer while loop" << endl;
+        // call handle client directly instead of this dumb thread
+        Client_Handler ch = Client_Handler(client, wd->messages, wd->message_map_lock);
+        ch.handle_client();
     }
-}
-
-void *
-handle_client(void *vptr) {
-    struct client_data* cd;
-    cd = (struct client_data*) vptr;
-
-    //cout << "Calling client_handler" << endl;
-    Client_Handler ch = Client_Handler(cd->client, cd->messages, cd->message_sem);
-    ch.handle_client();
 }
 
 void
