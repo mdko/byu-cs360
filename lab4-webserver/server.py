@@ -130,6 +130,7 @@ class Server:
                     self.cache[fd] = message[blankline:]
                     processed = self.processHTTP(message, fd)
                     if processed: # no entity body present, done
+                        self.cache[fd] = ""
                         self.debugPrint('Returned from processing the request and are done')
                         self.clients[fd].close()
                         del self.clients[fd]
@@ -152,6 +153,7 @@ class Server:
 
     def processHTTP(self, request, fd):
         processed, response_code = True, ('200', 'OK')
+        self.debugPrint('Entering processHTTP with this: ' + request)
 
         # read and parse the http request message
         lines = request.split('\r\n')
@@ -212,6 +214,7 @@ class Server:
                 if errno == 13:
                     # 403 Forbidden
                     response_code = ('403','Forbidden')
+                    self.debugPrint('Cannot read the file')
                 elif errno == 2:
                     # 404 Not Found
                     response_code = ('404','Not Found')
@@ -240,7 +243,7 @@ class Server:
         response += ''.join(general_headers)
         response += ''.join(response_headers)
         response += ''.join(entity_headers)
-        if content_size > 0:
+        if content_size > 0 and response_code[0] == '200':
             response += '\r\n'
             response += outfile.read()
 

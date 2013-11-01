@@ -46,13 +46,21 @@ class Tester:
         print "*** Persistent Connection ***"
         self.open_socket()
         self.send("GET / HTTP/1.1\r\nHost: %s\r\n\r\n" % self.host)
+        print 'Sent request 0'
         self.get_response([200],quiet=True)
+        print 'Got response 0'
         self.send("GET / HTTP/1.1\r\nHost: %s\r\n\r\n" % self.host)
+        print 'Sent request 1'
         self.get_response([200],quiet=True)
+        print 'Got response 1'
         self.send("GET / HTTP/1.1\r\nHost: %s\r\n\r\n" % self.host)
+        print 'Sent request 2'
         self.get_response([200],quiet=True)
+        print 'Got response 2'
         self.send("GET / HTTP/1.1\r\nHost: %s\r\n\r\n" % self.host)
+        print 'Sent request 3'
         self.get_response([200])
+        print 'Got response 3'
         self.close_socket()
 
     def testBad(self):
