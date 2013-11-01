@@ -1,0 +1,26 @@
+def sendFileContents(self, sock, file):
+        f = open(file, "rb")
+
+        def read10000():
+            return f.read(10000)
+
+        for piece in iter(read10000, ''):
+            sock.send(piece)
+        f.close()
+
+
+
+
+Has anyone found a helpful resource for doing Non-blocking IO? I've set my client socket as non blocking with the following code
+
+(client,address) = self.server.accept()
+client.setblocking(0)
+self.caches[client.fileno()] = ""
+self.clients[client.fileno()] = client
+self.poller.register(client.fileno(),self.pollmask)
+
+Non-blocking I/O just means you have to be prepared to receive EAGAIN or EWOULDBLOCK when you call send() or recv(). For send(), try again immediately. For recv(), store whatever the client has sent previously in a cache, and then stop handling that client and move on to the next one.
+
+
+
+request = "GET /index.html HTTP/1.1\r\nHost: cs360.byu.edu\r\nAccept: text/html,application/xhtml+xml,application/xml\r\nAccept-Encoding: gzip,deflate,sdch\r\nAccept-Language: en-US,en;q=0.8\r\nConnection:keep-alive\r\nUser-Agent:Mozilla/5.0 (X11; Linux x86_64) AppleWebKit\r\n\r\n"
