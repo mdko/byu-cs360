@@ -118,7 +118,7 @@ class Server:
             if data == socket.errno.EAGAIN or data == socket.errno.EWOULDBLOCK:
                 break
             if data:
-                self.debugPrint('Data received')
+                self.debugPrint('Data received: ' + data)
                 self.cache[fd] += data
                 blankline = data.find('\r\n\r\n')
                 if blankline >= 0:  # end of message
@@ -164,6 +164,10 @@ class Server:
             method, uri, version = request_line.split(' ')
         except ValueError:
             response_code = ('400', 'Bad Request')
+        if method.strip() not in ('OPTIONS', 'GET', 'HEAD', 'POST', 'PUT', 'DELETE','TRACE', 'CONNECT'):
+            response_code = ('400', 'Bad Request')
+        if method.strip() != 'GET':
+            response_code = ('501', 'Not implemented')
 
         if response_code[0] == '200':
             for header in header_lines:
@@ -184,7 +188,8 @@ class Server:
             filename = ''
             path = self.hosts['default']
             if uri == '/':
-                uri = 'index.html'
+                uri = '/index.html'
+            #elif uri[0] == '/': # absolute path, no prepending host?
             if not headers.has_key('Host'):
                 debugPrint('No Host Header')
                 response_code = ('400', 'Bad Request')
@@ -192,7 +197,7 @@ class Server:
                 host_value = headers['Host']
                 if self.hosts.has_key(host_value): #response_code = ('400', 'Bad Request') # request has host this server can't handle
                     path = self.hosts[host_value]
-            filename = path.strip() + '/' + uri
+            filename = path.strip() + uri
             self.debugPrint('Filename: ' + filename)   
 
         # generate and transmit the response
@@ -257,8 +262,7 @@ class Server:
         amount_sent  += self.clients[fd].send(response)
             #self.debugPrint('Amount sent so far: ' + str(amount_sent))
             #response = response[amount_sent:]
-        self.debugPrint('Done sending')
-        self.debugPrint('Sent: ' + response)
+        self.debugPrint('Sent:\n' + repr(response))
         
         # log request and any errors
 

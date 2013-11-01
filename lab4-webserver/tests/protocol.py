@@ -23,7 +23,7 @@ class Tester:
 
     def run(self):
         self.testHeaders()
-        self.testPersistent()
+        #self.testPersistent()
         self.testBad()
         self.testNotFound()
         self.testForbidden()
@@ -37,30 +37,24 @@ class Tester:
         print
         self.open_socket()
         self.send("GET / HTTP/1.1\r\nHost: %s\r\n\r\n" % self.host)
-        print 'Sent request'
         self.get_response([200],check=True)
-        print 'Got response'
         self.close_socket()
 
     def testPersistent(self):
         print "*** Persistent Connection ***"
         self.open_socket()
         self.send("GET / HTTP/1.1\r\nHost: %s\r\n\r\n" % self.host)
-        print 'Sent request 0'
         self.get_response([200],quiet=True)
-        print 'Got response 0'
+        #print 'Got response from 0'
         self.send("GET / HTTP/1.1\r\nHost: %s\r\n\r\n" % self.host)
-        print 'Sent request 1'
         self.get_response([200],quiet=True)
-        print 'Got response 1'
+        #print 'Got response from 1'
         self.send("GET / HTTP/1.1\r\nHost: %s\r\n\r\n" % self.host)
-        print 'Sent request 2'
         self.get_response([200],quiet=True)
-        print 'Got response 2'
+        #print 'Got response from 2'
         self.send("GET / HTTP/1.1\r\nHost: %s\r\n\r\n" % self.host)
-        print 'Sent request 3'
         self.get_response([200])
-        print 'Got response 3'
+        #print 'Got response from 3'
         self.close_socket()
 
     def testBad(self):
@@ -114,7 +108,6 @@ class Tester:
     def get_response(self,codes,check=False,quiet=False):
         ''' Check if response code is what was expected '''
         headers = self.read_headers()
-        print 'Done getting the headers'
         if self.verbose or check:
             print headers,
         entity = self.read_entity(headers)
@@ -162,19 +155,15 @@ class Tester:
 
     def read_headers(self):
         while True:
-            print 'Reading the header'
             data = self.server.recv(self.size)
-            print 'What protocol tester received:\n' + data
             if not data:
                 response = self.cache
                 self.cache = ''
-                print 'Done receiving data'
                 return response
             self.cache += data
             headers = self.get_headers()
             if not headers:
                 continue
-            print 'Returning the headers'
             return headers
 
     def read_bytes(self,length):
@@ -193,7 +182,6 @@ class Tester:
         index = self.cache.find("\r\n\r\n")
         if index == -1:
             return None
-        print 'Found end of message'
         headers = self.cache[0:index+4]
         self.cache = self.cache[index+4:]
         return headers
@@ -223,13 +211,18 @@ class Tester:
 
     def check_headers(self,headers,expected):
         lines = headers.split('\r\n')
+        # print 'Looking for: ' + expected
+        # print 'Header lines:\n' + '\n'.join(lines)
         for line in lines:
             if line == lines[0]:
                 continue
             if line == '':
                 continue
             name, value = line.split(':',1)
+            # print 'Name found: ' + name + ', Value: ' + value
+            # print name == expected
             if name == expected:
+                # print 'Returning true'
                 return True
         return False
 
