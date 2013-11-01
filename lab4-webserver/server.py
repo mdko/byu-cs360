@@ -3,11 +3,11 @@ import socket
 import sys
 import time
 import os
-filename = '/etc/motd'
 
 class Server:
     """ Web Server """
-    def __init__(self,port):
+    def __init__(self,port,dbg):
+        self.debug = dbg
         self.host = ""
         self.port = port
         self.open_socket()
@@ -16,8 +16,13 @@ class Server:
         self.configure()
         self.clients = {}
         self.last_event = {}
+        self.begin = time.time()
         self.cache = {}
         self.size = 1024
+
+    def debugPrint(self, msg):
+        if self.debug == True:
+            print msg
 
     def configure(self):
         configfile = open('web.conf')
@@ -28,11 +33,11 @@ class Server:
             elif parts[0] == 'host':
                 name = parts[1]
                 path = parts[2]
-                self.hosts[name] = path
+                self.hosts[name] = path.strip()
             elif parts[0] == 'media':
                 ext = parts[1]
                 mtype = parts[2]
-                self.media[ext] = mtype
+                self.media[ext] = mtype.strip()
             elif parts[0] == 'parameter':
                 timeout = parts[1]
                 if timeout != 'timeout':
@@ -62,14 +67,20 @@ class Server:
         self.pollmask = select.EPOLLIN | select.EPOLLHUP | select.EPOLLERR
         self.poller.register(self.server,self.pollmask)
         while True:
-            # check for sockets who have idled
-            markAndSweepIdleSockets()
+            #debugPrint('Top of run loop in server.py')
+            # check for sockets who have idled TODO fix this
+            if (time.time() - self.begin) > self.timeout:
+                self.debugPrint('Entering mark and sweep method')
+                self.markAndSweepIdleSockets()
+                self.begin = time.time()
             # poll sockets
             try:
                 fds = self.poller.poll(timeout=1)
             except:
                 return
             for (fd,event) in fds:
+                self.last_event[fd] = time.time()
+                self.debugPrint('Cycling through events')
                 # handle errors
                 if event & (select.POLLHUP | select.POLLERR):
                     self.handleError(fd)
@@ -77,8 +88,10 @@ class Server:
                 # handle the server socket
                 if fd == self.server.fileno():
                     self.handleServer()
+                    self.debugPrint('Handling server socket')
                     continue
                 # handle client socket
+                self.debugPrint('Handling client socket')
                 result = self.handleClient(fd)
 
     def handleError(self,fd):
@@ -101,14 +114,15 @@ class Server:
 
     def handleClient(self,fd):
         while True:
-            self.last_event[fd] = time.time()
             data = self.clients[fd].recv(self.size)
             if data == socket.errno.EAGAIN or data == socket.errno.EWOULDBLOCK:
                 break
             if data:
+                self.debugPrint('Data received')
                 self.cache[fd] += data
                 blankline = data.find('\r\n\r\n')
                 if blankline >= 0:  # end of message
+                    self.debugPrint('Found blank line, end of message')
                     message = self.cache[fd]
                     message = message[:blankline]
                     # remove request (up to and including blankline), 
@@ -116,6 +130,9 @@ class Server:
                     self.cache[fd] = message[blankline:]
                     processed = self.processHTTP(message, fd)
                     if processed: # no entity body present, done
+                        self.debugPrint('Returned from processing the request and are done')
+                        self.clients[fd].close()
+                        del self.clients[fd]
                         break
             else:
                 self.poller.unregister(fd)
@@ -124,11 +141,13 @@ class Server:
 
 
     def markAndSweepIdleSockets(self):
+        print 'Marking and sweeping'
         curr_time = time.time()
         for socket in self.clients:
-            if ((curr_time - self.last_time[socket]) > self.timeout):
-                self.clients[fd].close()
-                del self.clients[fd]
+            last_time = self.last_event[socket.fileno()]
+            if ((curr_time - last_time) > self.timeout):
+                socket.close()
+                del socket
 
 
     def processHTTP(self, request, fd):
@@ -149,7 +168,10 @@ class Server:
                 # implement General Headers (Date), Request Headers (Host),
                 # Response Headers (Server), and Entity Headers(Content-Type, Content-Length, and Last-Modified)
                 # however, it doesn't really matter if I split them up into their categories right now
-                field_name, value = header.split(':')
+                splits = header.split(':')
+                field_name = splits[0] #TODO check this
+                value = splits[1]
+                # field_name, value = header.split(':')
                 if field_name not in ('Host', 'Date', 'Server', 'Content-Type', 'Content-Length', 'Last-Modified'):
                     # ignore the others, according the lab spec
                     pass
@@ -158,28 +180,28 @@ class Server:
             # translate the uri to a file name
             #   need web server configuration to determine the document root
             filename = ''
-            if url == '/':
-                filename = '/index.html'
+            path = self.hosts['default']
+            if uri == '/':
+                uri = 'index.html'
+            if not headers.has_key('Host'):
+                debugPrint('No Host Header')
+                response_code = ('400', 'Bad Request')
             else:
-                if not headers.has_key('Host'):
-                    respone_code = ('400', 'Bad Request')
-                else:
-                    host_value = headers['Host']
-                    if not self.hosts.has_key(host_value):
-                        response_code = ('400', 'Bad Request') # request has host this server can't handle
-                    else:
-                        path = self.hosts[host_value]
-                        filename = path + '/' + uri
-            
+                host_value = headers['Host']
+                if self.hosts.has_key(host_value): #response_code = ('400', 'Bad Request') # request has host this server can't handle
+                    path = self.hosts[host_value]
+            filename = path.strip() + '/' + uri
+            self.debugPrint('Filename: ' + filename)   
 
         # generate and transmit the response
         #   error code or file or results of script
         #   must be a valid HTTP message with appropriate headers
         current_time = getTime(time.time())
-        general_headers = ['Date:' + current_time + '\r\n']
-        response_headers = ['Server:cs360-mchristensen/1.1.11 (Ubuntu)\r\n']
+        general_headers = ['Date: ' + current_time + '\r\n']
+        response_headers = ['Server: cs360-mchristensen/1.1.11 (Ubuntu)\r\n']
         
         entity_headers = []
+        content_size = 0    
         if response_code[0] == '200': # means we're good so far at least
             # determine whether the request is authorized
             #   check file permissions or other authorization procedure
@@ -199,18 +221,18 @@ class Server:
 
             if (response_code[0] == '200'): # means file exists
                 filetype = 'text/plain' #default for files with no extension
-                if outFile:
+                if outfile:
                     if outfile.name.find('.'): #if it has an extension, supposedly
-                        filesplit = outfile.split('.')
+                        filesplit = outfile.name.split('.')
                         fileext = filesplit[-1]
                         if (self.media.has_key(fileext)): #if it's a recognized extension
                             filetype = self.media[fileext] 
-                content_size = os.stat(outFile).st_size
-                last_mod = os.stat(outFile).st_mtime
+                content_size = os.stat(outfile.name).st_size
+                last_mod = os.stat(outfile.name).st_mtime
                 last_mod_time = getTime(last_mod)
-                entity_headers = ['Content-Type:' + filetype + '\r\n', \
-                                    'Content-Length:' + content_size + '\r\n', \
-                                    'Last-Modified:' + last_mod_time + '\r\n']
+                entity_headers = ['Content-Type: ' + filetype + '\r\n', \
+                                    'Last-Modified: ' + str(last_mod_time) + '\r\n']
+        entity_headers.append('Content-Length: ' + str(content_size) + '\r\n')
 
         status_line = 'HTTP/1.1' + ' ' + response_code[0] + ' ' + response_code[1] + '\r\n'
 
@@ -219,14 +241,21 @@ class Server:
         response += ''.join(response_headers)
         response += ''.join(entity_headers)
         if content_size > 0:
+            response += '\r\n'
             response += outfile.read()
 
 
         response_size = len(response)
         amount_sent = 0
-        while amount_sent < response_size:
-            amount_sent  += self.clients[fd].send(response)
-
+        self.debugPrint('Response size: ' + str(response_size))
+        # TODO fix this?
+        #while amount_sent < response_size:
+            #self.debugPrint('Haven\'t sent enough')
+        amount_sent  += self.clients[fd].send(response)
+            #self.debugPrint('Amount sent so far: ' + str(amount_sent))
+            #response = response[amount_sent:]
+        self.debugPrint('Done sending')
+        self.debugPrint('Sent: ' + response)
         
         # log request and any errors
 
@@ -241,7 +270,7 @@ class Server:
         return processed
 
 def getTime(t):
-    gmt = time.gmttime(t)
+    gmt = time.gmtime(t)
     format = '%a, %d %b %Y %H:%M:%S GMT'
     time_string = time.strftime(format,gmt)
     return time_string

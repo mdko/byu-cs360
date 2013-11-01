@@ -10,12 +10,12 @@ class Main:
         ''' parse arguments, which include '-p' for port and '-d' for debugging '''
         parser = argparse.ArgumentParser(prog='Web Server', description='An event-driven web server', add_help=True)
         parser.add_argument('-p', '--port', type=int, action='store', help='port the server will bind to',default=8080)
-        parser.add_argument('-d', '--debug', type=int, action='store', help='debug flag to turn on debugging on the server',default=False)
+        parser.add_argument('-d', '--debug', type=bool, action='store', help='debug flag to turn on debugging on the server',default=False)
         self.args = parser.parse_args()
 
 
     def run(self):
-        s = Server(self.args.port)
+        s = Server(self.args.port,self.args.debug)
         s.run()
 
 
