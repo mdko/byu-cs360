@@ -45,16 +45,12 @@ class Tester:
         self.open_socket()
         self.send("GET / HTTP/1.1\r\nHost: %s\r\n\r\n" % self.host)
         self.get_response([200],quiet=True)
-        #print 'Got response from 0'
         self.send("GET / HTTP/1.1\r\nHost: %s\r\n\r\n" % self.host)
         self.get_response([200],quiet=True)
-        #print 'Got response from 1'
         self.send("GET / HTTP/1.1\r\nHost: %s\r\n\r\n" % self.host)
         self.get_response([200],quiet=True)
-        #print 'Got response from 2'
         self.send("GET / HTTP/1.1\r\nHost: %s\r\n\r\n" % self.host)
         self.get_response([200])
-        #print 'Got response from 3'
         self.close_socket()
 
     def testBad(self):
