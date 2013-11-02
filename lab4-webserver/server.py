@@ -20,6 +20,7 @@ class Server:
         self.supported_header_names = ('Host', 'Date', 'Server', 'Content-Type', 'Content-Length', 'Last-Modified')
         self.last_event = {}
         self.begin = time.time()
+        self.sweep_wait = 3
         self.cache = {}
         self.size = 1024
 
@@ -70,9 +71,10 @@ class Server:
         self.pollmask = select.EPOLLIN | select.EPOLLHUP | select.EPOLLERR
         self.poller.register(self.server,self.pollmask)
         while True:
-            #debugPrint('Top of run loop in server.py')
-            # check for sockets who have idled TODO fix this
-            if (time.time() - self.begin) > self.timeout:
+            curr_time = time.time()
+            elapsed = curr_time - self.begin
+            self.debugPrint('Elapsed time: ' + str(elapsed))
+            if elapsed > self.sweep_wait:
                 self.debugPrint('Entering mark and sweep method')
                 self.markAndSweepIdleSockets()
                 self.begin = time.time()
@@ -82,6 +84,7 @@ class Server:
             except:
                 return
             for (fd,event) in fds:
+                self.debugPrint('I\'ve been polled!')
                 self.last_event[fd] = time.time()
                 self.debugPrint('Cycling through events')
                 # handle errors
@@ -96,6 +99,7 @@ class Server:
                 # handle client socket
                 self.debugPrint('Handling client socket')
                 result = self.handleClient(fd)
+            self.debugPrint('No more events to handle, going up to top of loop')
 
     def handleError(self,fd):
         self.poller.unregister(fd)
@@ -132,22 +136,26 @@ class Server:
                     processed = self.processHTTP(message, fd)
                     if processed: # no entity body present, done
                         self.cache[fd] = ""
-                        self.clients[fd].close()
-                        del self.clients[fd]
-                        break
+                        #break
             else:
                 self.poller.unregister(fd)
                 self.clients[fd].close()
                 del self.clients[fd]
+                break
+
+
 
 
     def markAndSweepIdleSockets(self):
-        print 'Marking and sweeping'
         curr_time = time.time()
         for socket in self.clients:
-            last_time = self.last_event[socket.fileno()]
+            if socket == self.server.fileno():
+                continue
+
+            last_time = self.last_event[socket]
             if ((curr_time - last_time) > self.timeout):
                 socket.close()
+                self.poller.unregister(socket)
                 del socket
 
     # Can raise Exceptions, which are handled by caller in processHTTP
@@ -160,7 +168,6 @@ class Server:
             response_code = ('501', 'Not implemented')  
         return method, uri, version, response_code
 
-
     # Implements:
     #   General Headers (Date)
     #   Request Headers (Host)
@@ -169,7 +176,7 @@ class Server:
     def parseHeaders(self, header_lines):
         headers = {}
         for header in header_lines:
-            field_name, value = header.split(':', 2)
+            field_name, value = header.split(':', 1)
             field_name, value = field_name.strip(), value.strip() #TODO not sure if I should be accepting this type of malformed values (with extra ws)
             # Ignore the others, according the lab specification
             if field_name not in self.supported_header_names:
@@ -181,11 +188,13 @@ class Server:
     # Use web server configuration to determine the document root
     def formFileName(self, host, uri):
         hostname = self.hosts['default']
+        # Remove the attached port if necessary
+        host = host.split(':')[0]
         if uri == '/':
-            uri = '/index.html'
+            uri = 'index.html'
         if self.hosts.has_key(host): #If this host is identified in the configuration file, we won't use the 'default' value
             hostname = self.hosts[host]
-        filename = hostname + uri
+        filename = hostname + '/' + uri
         return filename
 
     def fillEntityHeaders(self, ifile):
@@ -230,6 +239,8 @@ class Server:
 
     # Read and respond to the http request message
     def processHTTP(self, request, fd):
+        self.debugPrint('Incoming request:\n' + request)
+
         processed, response_code = True, ('200', 'OK')
         lines = request.split('\r\n')
 
@@ -249,16 +260,19 @@ class Server:
             # Translate the uri to a file name
             host = headers['Host']
             filename = self.formFileName(host, uri)
+            self.debugPrint('Desired file: ' + filename)
 
             # Try to access the file requested
             outfile = open(filename)
             entity_headers = self.fillEntityHeaders(outfile)
             entity_body = outfile.read()
 
-        except (ValueError, IndexError, KeyError):
+        except (ValueError, IndexError, KeyError) as error:
+            self.debugPrint('Exception: %s' % error)
             response_code = ('400', 'Bad Request')
         except IOError as (errno, strerror):
             entity_headers['Content-Length'] = 0
+            #entity_headers['Content-Type'] = 'text/plain' # This shouldn't be required if there is no entity-body included
             if errno == 13:
                 response_code = ('403','Forbidden')
             elif errno == 2:
@@ -279,11 +293,14 @@ class Server:
         response += entity_body
 
         ###### Send the response #######
+        self.debugPrint('Outgoing response:\n' + response)
+
         response_size = len(response)
         amount_sent = 0
         while amount_sent < response_size:
             amount_sent  += self.clients[fd].send(response)
             response = response[amount_sent:]
+
 
         # if headers.has_key('Content-Length'):
         #     content_length = headers['Content-Length']
