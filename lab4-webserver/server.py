@@ -73,9 +73,9 @@ class Server:
         while True:
             curr_time = time.time()
             elapsed = curr_time - self.begin
-            self.debugPrint('Elapsed time: ' + str(elapsed))
+            #self.debugPrint('Elapsed time: ' + str(elapsed))
             if elapsed > self.sweep_wait:
-                self.debugPrint('Entering mark and sweep method')
+                #self.debugPrint('Entering mark and sweep method')
                 self.markAndSweepIdleSockets()
                 self.begin = time.time()
             # poll sockets
@@ -99,7 +99,7 @@ class Server:
                 # handle client socket
                 self.debugPrint('Handling client socket')
                 result = self.handleClient(fd)
-            self.debugPrint('No more events to handle, going up to top of loop')
+            #self.debugPrint('No more events to handle, going up to top of loop')
 
     def handleError(self,fd):
         self.poller.unregister(fd)
@@ -108,6 +108,7 @@ class Server:
             self.server.close()
             self.open_socket()
             self.poller.register(self.server,self.pollmask)
+            self.server.setblocking(0)
         else:
             # close the socket
             self.clients[fd].close()
@@ -118,6 +119,7 @@ class Server:
         self.clients[client.fileno()] = client
         self.cache[client.fileno()] = ""
         self.poller.register(client.fileno(),self.pollmask)
+        client.setblocking(0)
 
     def handleClient(self,fd):
         while True:
@@ -130,13 +132,11 @@ class Server:
                 if blankline >= 0:  # end of message
                     alldata = self.cache[fd]
                     message = alldata[:blankline]
-                    # remove request (up to and including blankline), 
-                    # leave anything after request in cache still
                     self.cache[fd] = alldata[blankline:]
                     processed = self.processHTTP(message, fd)
-                    if processed: # no entity body present, done
+                    if processed:
                         self.cache[fd] = ""
-                        #break
+                        break
             else:
                 self.poller.unregister(fd)
                 self.clients[fd].close()
@@ -152,11 +152,14 @@ class Server:
             if socket == self.server.fileno():
                 continue
 
-            last_time = self.last_event[socket]
-            if ((curr_time - last_time) > self.timeout):
-                socket.close()
-                self.poller.unregister(socket)
-                del socket
+            try:
+                last_time = self.last_event[socket]
+                if ((curr_time - last_time) > self.timeout):
+                    socket.close()
+                    self.poller.unregister(socket)
+                    del socket
+            except:
+                continue
 
     # Can raise Exceptions, which are handled by caller in processHTTP
     def parseRequest(self, request_line):
@@ -165,7 +168,7 @@ class Server:
         if method not in self.known_methods:
             response_code = ('400', 'Bad Request')
         elif method not in self.supported_methods:
-            response_code = ('501', 'Not implemented')  
+            response_code = ('501', 'Not implemented')
         return method, uri, version, response_code
 
     # Implements:
@@ -187,14 +190,16 @@ class Server:
 
     # Use web server configuration to determine the document root
     def formFileName(self, host, uri):
-        hostname = self.hosts['default']
+        docroot = self.hosts['default']
         # Remove the attached port if necessary
         host = host.split(':')[0]
         if uri == '/':
             uri = 'index.html'
         if self.hosts.has_key(host): #If this host is identified in the configuration file, we won't use the 'default' value
-            hostname = self.hosts[host]
-        filename = hostname + '/' + uri
+            docroot = self.hosts[host]
+        if uri.startswith('/'):
+            uri = uri[1:]
+        filename = docroot + '/' + uri
         return filename
 
     def fillEntityHeaders(self, ifile):
@@ -225,6 +230,21 @@ class Server:
         response_headers = {'Server':'cs360-mchristensen/1.1.11 (Ubuntu)'}
         return response_headers
 
+    def makeErrorEntityBody(self, response_code):
+        if response_code[0] == '400':
+            return 'Bad request sent to the server.'
+        elif response_code[0] == '403':
+            return 'Cannot access the requested resource due to permissions'
+        elif response_code[0] == '404':
+            return 'Requested resource cannot be found'
+        elif response_code[0] == '500':
+            return 'The server has experience an internal error'
+        elif response_code[0] == '501':
+            return 'Requested method is not implemented by this server'
+        else:
+            return 'No error'
+
+
     def buildLines(self, headerDict):
         lines = ''
         for (key, value) in headerDict.items():
@@ -252,33 +272,42 @@ class Server:
         try:
             request_line = lines[0].strip()
             method, uri, version, response_code = self.parseRequest(request_line)
+            if response_code[0] != '200':
+                entity_body = self.makeErrorEntityBody(response_code)
+                entity_headers['Content-Type'] = 'text/plain'
+                entity_headers['Content-Length'] = len(entity_body)         
+            else:
+                # Header Line (We assume there must be one header fields, at least a 'Host' header, so it is an error if we can't slice like this)
+                header_lines = lines[1:]
+                headers = self.parseHeaders(header_lines) # Normally we'd do stuff with these headers, but we only need the 'Host' value for the basic functionality
+                
+                # Translate the uri to a file name
+                host = headers['Host']
+                filename = self.formFileName(host, uri)
+                self.debugPrint('Desired file: ' + filename)
 
-            # Header Line (We assume there must be one header fields, at least a 'Host' header, so it is an error if we can't slice like this)
-            header_lines = lines[1:]
-            headers = self.parseHeaders(header_lines) # Normally we'd do stuff with these headers, but we only need the 'Host' value for the basic functionality
-            
-            # Translate the uri to a file name
-            host = headers['Host']
-            filename = self.formFileName(host, uri)
-            self.debugPrint('Desired file: ' + filename)
-
-            # Try to access the file requested
-            outfile = open(filename)
-            entity_headers = self.fillEntityHeaders(outfile)
-            entity_body = outfile.read()
+                # Try to access the file requested
+                outfile = open(filename)
+                entity_headers = self.fillEntityHeaders(outfile)
+                entity_body = outfile.read()
 
         except (ValueError, IndexError, KeyError) as error:
             self.debugPrint('Exception: %s' % error)
             response_code = ('400', 'Bad Request')
+            entity_body = self.makeErrorEntityBody(response_code)
+            entity_headers['Content-Type'] = 'text/plain'
+            entity_headers['Content-Length'] = len(entity_body) 
         except IOError as (errno, strerror):
-            entity_headers['Content-Length'] = 0
-            #entity_headers['Content-Type'] = 'text/plain' # This shouldn't be required if there is no entity-body included
             if errno == 13:
                 response_code = ('403','Forbidden')
             elif errno == 2:
                 response_code = ('404','Not Found')
             else:
                 response_code = ('500','Internal Server Error')
+            entity_body = self.makeErrorEntityBody(response_code)
+            entity_headers['Content-Type'] = 'text/plain'
+            entity_headers['Content-Length'] = len(entity_body)
+
         
         ####### Generate the response #######
         status_line = 'HTTP/1.1' + ' ' + response_code[0] + ' ' + response_code[1] + '\r\n'
@@ -301,14 +330,4 @@ class Server:
             amount_sent  += self.clients[fd].send(response)
             response = response[amount_sent:]
 
-
-        # if headers.has_key('Content-Length'):
-        #     content_length = headers['Content-Length']
-        #     #processed = False
-        #     processed = True
-        #     # an entity body comes after the blank line that ended this request
-        #     # however, the spec doesn't have us doing anything with the entity body of a request.
-        #     # we would continue with the calling function to keep reading until we've reached this length
-        #     # of bytes read
         return processed
-        
