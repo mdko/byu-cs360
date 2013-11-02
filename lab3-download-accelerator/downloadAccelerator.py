@@ -41,8 +41,8 @@ class DownloadAccelerator:
         # of threads
         threads = []
         for i in range(0, self.n_threads):
-            start_byte, end_byte = i * section_size, (i + 1) * section_size
-            if i + 1 == self.n_threads:
+            start_byte, end_byte = (i * section_size), (i + 1) * section_size - 1 # This was very difficult for me to realize/find that the end-byte was inclusive
+            if (i + 1) == self.n_threads:
                 end_byte = file_size
             d = DownThread(self.url, start_byte, end_byte)
             threads.append(d)
@@ -63,6 +63,17 @@ class DownloadAccelerator:
         f.write(''.join(whole_file))
         f.close()
 
+        # Trying something new...
+        # with open(self.file_name,'wb') as fd:
+        #     for t in threads:
+        #         t.join()
+        #         for chunk in t.section.iter_content():
+        #             fd.write(chunk)
+        #     fd.close()
+        # t2 = time.time()
+        # seconds = t2 - t1
+
+
         print self.url + ' ' + str(self.n_threads) + ' ' + str(file_size) + ' ' + str(seconds)
 
 ''' Use a thread to download the specific part of the file'''
@@ -78,6 +89,8 @@ class DownThread(threading.Thread):
         if file_section.headers['content-range'] == None:
             raise Exception('No content-range header value found. Exiting...')
         self.content = file_section.content
+        # self.content = file_section.raw.read()
+        # self.section = file_section
 
 
 if __name__ == "__main__":

@@ -48,3 +48,4 @@ http://ilab.cs.byu.edu/zappala/files/design-philosophy-sigcomm-88.pdf 10 1180016
 http://ilab.cs.byu.edu/zappala/files/design-philosophy-sigcomm-88.pdf 10 1180016 3.71172690392
 http://ilab.cs.byu.edu/zappala/files/design-philosophy-sigcomm-88.pdf 10 1180016 3.45395994186
 http://ilab.cs.byu.edu/zappala/files/design-philosophy-sigcomm-88.pdf 10 1180016 2.27339696884
+http://ilab.cs.byu.edu/zappala/files/design-philosophy-sigcomm-88.pdf 1 1180016 25.027354002
