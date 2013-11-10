@@ -16,8 +16,8 @@ class Server:
         self.configure()
         self.clients = {}
         self.known_methods = ('OPTIONS', 'GET', 'HEAD', 'POST', 'PUT', 'DELETE','TRACE', 'CONNECT')
-        self.supported_methods = ('GET')
-        self.supported_header_names = ('Host', 'Date', 'Server', 'Content-Type', 'Content-Length', 'Last-Modified')
+        self.supported_methods = ('GET', 'HEAD')
+        self.supported_header_names = ('Host', 'Date', 'Server', 'Content-Type', 'Content-Length', 'Last-Modified', 'Range')
         self.last_event = {}
         self.begin = time.time()
         self.sweep_wait = 3
@@ -133,8 +133,16 @@ class Server:
                     alldata = self.cache[fd]
                     message = alldata[:blankline]
                     self.cache[fd] = alldata[blankline:]
-                    processed = self.processHTTP(message, fd)
+                    processed, response = self.processHTTP(message, fd)
                     if processed:
+                        response_size = len(response)
+                        total_amount_sent = 0
+                        while total_amount_sent < response_size:
+                            try:
+                                amount_sent  = self.clients[fd].send(response[total_amount_sent:])
+                            except:
+                                continue
+                            total_amount_sent += amount_sent
                         self.cache[fd] = ""
                         break
             else:
@@ -202,9 +210,14 @@ class Server:
         filename = docroot + '/' + uri
         return filename
 
-    def fillEntityHeaders(self, ifile):
+    def fillEntity(self, method, headers, ifile):
         filetype = 'text/plain' #Default for files with no extension
         entity_headers = {}
+        last_mod = os.stat(ifile.name).st_mtime
+        last_mod_time = self.getTime(last_mod)
+        entity_body = ''
+        response_code = ('200', 'OK')
+
         try:
             name,sep,ext = ifile.name.rpartition('.')
             # If there was a way to separate the file name by the dot ('name' will be empty if it wasn't possible)
@@ -213,13 +226,29 @@ class Server:
                 filetype = self.media[ext]
         except KeyError:
             pass
-        content_size = os.stat(ifile.name).st_size
-        last_mod = os.stat(ifile.name).st_mtime
-        last_mod_time = self.getTime(last_mod)
+
+        if method == 'GET':
+            self.debugPrint('Found a HEAD request')
+            if headers.has_key('Range'):
+                filerange = headers['Range']
+                filerange = filerange.split('=')[1]
+                filerange = filerange.split('-')
+                start, end = int(filerange[0]), int(filerange[1])
+                ifile.seek(start)
+                entity_body = ifile.read((end-start)+1)
+                response_code = ('206', 'Partial Content')
+            else:
+                entity_body = ifile.read()
+        elif method == 'HEAD':
+            self.debugPrint('Found a HEAD request')
+            
+
+        #content_size = os.stat(ifile.name).st_size
         entity_headers['Content-Type'] = filetype
-        entity_headers['Content-Length'] = content_size
+        entity_headers['Content-Length'] = len(entity_body)
         entity_headers['Last-Modified'] = last_mod_time
-        return entity_headers
+
+        return entity_headers, entity_body, response_code
 
     def fillGeneralHeaders(self):
         current_time = self.getTime(time.time())
@@ -288,8 +317,7 @@ class Server:
 
                 # Try to access the file requested
                 outfile = open(filename)
-                entity_headers = self.fillEntityHeaders(outfile)
-                entity_body = outfile.read()
+                entity_headers, entity_body, response_code = self.fillEntity(method, headers, outfile)
 
         except (ValueError, IndexError, KeyError) as error:
             self.debugPrint('Exception: %s' % error)
@@ -321,13 +349,7 @@ class Server:
         response += '\r\n'
         response += entity_body
 
-        ###### Send the response #######
-        self.debugPrint('Outgoing response:\n' + response)
+        ###### Make response ready for sending by calling method #######
+        #self.debugPrint('Outgoing response:\n' + response)
 
-        response_size = len(response)
-        amount_sent = 0
-        while amount_sent < response_size:
-            amount_sent  += self.clients[fd].send(response)
-            response = response[amount_sent:]
-
-        return processed
+        return processed, response

@@ -23,7 +23,7 @@ class Tester:
 
     def run(self):
         self.testHeaders()
-        #self.testPersistent()
+        self.testPersistent()
         self.testBad()
         self.testNotFound()
         self.testForbidden()
@@ -207,18 +207,13 @@ class Tester:
 
     def check_headers(self,headers,expected):
         lines = headers.split('\r\n')
-        # print 'Looking for: ' + expected
-        # print 'Header lines:\n' + '\n'.join(lines)
         for line in lines:
             if line == lines[0]:
                 continue
             if line == '':
                 continue
             name, value = line.split(':',1)
-            # print 'Name found: ' + name + ', Value: ' + value
-            # print name == expected
             if name == expected:
-                # print 'Returning true'
                 return True
         return False
 
