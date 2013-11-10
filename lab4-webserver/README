@@ -1,0 +1,20 @@
+My code is found in both web.py and server.py, with the functionality of the web-server in server.py. I implemented non-blocking I/O through lines 68 to 144, where in run(), I have a continuous while loop that polls for any events, and then handles these events, if present, one by one. In line 111 and line 122 I set the sockets to non-blocking, and in handleClient() [line 124], I only stay with a client while it has data to give me/isn't idle.
+
+With timeouts, I first check if an arbitrary amount of time has passed at the start of each loop in the the run method [line 77], and if it has, run through and mark and sweep each socket, checking to see if it hasn't had an event on it in the last 'timeout' seconds (from the web.conf file). If it has, [line 157], it is closed. The way I know how long time has elapsed since a socket had an event is in line 88, where I mark the appropriate entry in a self.last_event dictionary the class maintains.
+
+With caching, I store everything from a particular client in a class dictionary called self.cache [line 130] and when I encounter a blank line data I've been caching, I know it is time to take everything up that blank line from the cache and process it [lines 133-136], leaving the rest after the blank line in the cache for further use if necessary.
+
+A BIG NOTE: I am currently possibly confused about how to configure my web.conf file. I have it so that if you use "default" as the host name for the stress-tests.py and protocol.py scripts (the ones I think you are grading according to the grading sheet). I've run everything that I believe will be tested according to the grading sheet and feel like I have done everything required. If for some reason the configuration doesn't work, I would very much appreciate being able to explain to you what I meant personally before I lose possibly all or most of the points of this project, which is working according to what I've ran and seen.
+
+I also implemented the extra credit range request [lines 222-235].
+
+I had to change the permissions of the 'test.txt' file to allow me to tar up my project. You need to change it back to what's wanted with:
+    chmod ugo-rwx static/files/test.txt
+
+For the protocol test, it is configured to be:
+    python protocol.py -p 8080 -e
+
+For the stress tests, it is configured to be:
+    python stress-test.py localhost:8080/[filepath] -t [Number] -d [Number]
+For example:
+    python stress-test.py localhost:8080/static/files/I-Have-A-Dream.pdf -t 100 -d 10
