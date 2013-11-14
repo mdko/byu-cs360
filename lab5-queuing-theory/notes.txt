@@ -1,0 +1,24 @@
+Average Lighttpd Time: 0.002923
+Average Time for my Server: 0.003103
+Mu lighttpd server: 342.067130
+Mu my server: 322.262961
+Average for ours load 3: 0.002481
+Average for ours load 16: 0.002542
+Average for ours load 32: 0.002693
+Average for ours load 80: 0.003187
+Average for ours load 161: 0.003917
+Average for ours load 241: 0.005237
+Average for ours load 290: 0.006313
+Average for ours load 306: 0.005839
+Average for ours load 315: 0.004973
+Average for ours load 319: 0.005330
+Average for lighttpd load 3: 0.002484
+Average for lighttpd load 17: 0.002525
+Average for lighttpd load 34: 0.002570
+Average for lighttpd load 85: 0.002869
+Average for lighttpd load 171: 0.003810
+Average for lighttpd load 256: 0.005443
+Average for lighttpd load 307: 0.005538
+Average for lighttpd load 324: 0.007523
+Average for lighttpd load 335: 0.005464
+Average for lighttpd load 338: 0.004914
