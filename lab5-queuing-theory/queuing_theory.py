@@ -109,27 +109,21 @@ def performance_evaluation(mu_l, mu_m):
     # On the same graph, plot the theoretical line from Part 2
     # You convert your mu into a certain number of clients per second. Then you vary from 10% to 95% or 98%.
 
-    # clientspersecl = 
-    # lambdaam = np.arange(0,mu_m,mu_m/10.0)
-    # lambdaal = np.arange(0,mu_l,mu_l/10.0)
-    # utilization = np.arange(0, 1.0, 0.05) # 0 to max utilization (1.0), 0.05 increments
-    # mu = lambdaa/utilization
-    # utilization = lambdaa/mu
-
-    lambdasperc = [0.01, 0.05, 0.10, 0.25, 0.50, 0.75, 0.90, 0.95, 0.98, 0.99]
+    utilization = [0.01, 0.05, 0.10, 0.25, 0.50, 0.75, 0.90, 0.95, 0.98, 0.99]
     loadsm = [] # could also do loadsm = map(lambda x: x * mu_m, lambdasperc)
     loadsl = [] # could also do loadsl = map(lambda x: x * mu_l, lambdasperc)
 
-    # for percent in lambdasperc:
-    #     load = percent * mu_m
-    #     loadsm.append(load)
-    #     os.system('python ../lab4-webserver/tests/generator.py --port 8080 -l %d -d 30 >> ./part3/ours/web-ours-%d.txt' % (load, load))
-    # for percent in lambdasperc:
-    #     load = percent * mu_l
-    #     loadsl.append(load)
-    #     os.system('python ../lab4-webserver/tests/generator.py --port 3000 -l %d -d 30 >> ./part3/lighttpd/web-lighttpd-%d.txt' % (load, load)) 
+    for percent in utilization:
+        load = percent * mu_m # lambda
+        loadsm.append(load)
+        os.system('python ../lab4-webserver/tests/generator.py --port 8080 -l %d -d 30 >> ./part3/ours/web-ours-%d.txt' % (load, load))
+    for percent in utilization:
+        load = percent * mu_l
+        loadsl.append(load)
+        os.system('python ../lab4-webserver/tests/generator.py --port 3000 -l %d -d 30 >> ./part3/lighttpd/web-lighttpd-%d.txt' % (load, load)) 
 
-    loadsm = [3, 16, 32, 80, 161, 241, 290, 306, 315, 319]
+    #	loadsm = [3, 16, 32, 80, 161, 241, 290, 306, 315, 319] # For debugging, not having to run many files again
+    # Our Web Server
     avg_ours_times = {}
     all_our_times = {}  # map from load number to a list of times
     for l in loadsm:
@@ -145,18 +139,20 @@ def performance_evaluation(mu_l, mu_m):
         all_our_times[l] = all_times
     
         avg_ours_times[l] = total_time/total_lines
-        print 'Average for ours load %d: %f' % (l, avg_ours_times[l])
+        print 'Average for ours load %d: %f' % (l, avg_ours_times[l])	# unneeded, but for my information
 
     """ Create a box plot of the download time"""
     clf()
-    boxplot(all_our_times.values(),positions=lambdasperc,widths=0.01)
+    boxplot(all_our_times.values(),positions=utilization,widths=0.01)
     xlim(0,1)
+    # TODO graph theoretical line with this plot of boxplots
     # ylim(0,1)
     # plot(np.arange(0,mu_m,1.0)/mu_m,1/(mu_m-np.arange(0,mu_m,1.0)))
     # xlabel('Utilization')
     # ylabel('Average Response Time')
     savefig('download-boxplot%d.png' % (l))
 
+    # TODO Lighttpd Web Server
     # avg_lighttpd_times = {}
     # for l in loadsl:
     #     f = open('./part3/lighttpd/web-lighttpd-%d.txt' % (l))
