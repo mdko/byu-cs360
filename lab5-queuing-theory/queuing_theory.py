@@ -46,7 +46,7 @@ def queuing_analysis():
     elapsed = 0
     while tests < 100:
         start = time.time()
-        r = requests.get('http://localhost:3000/file000.txt')
+        r = requests.get('http://localhost:3000/file446.txt')
         end = time.time()
         if  r.status_code == 200:
             tests += 1
@@ -59,7 +59,7 @@ def queuing_analysis():
     elapsed = 0
     while tests < 100:
         start = time.time()
-        r = requests.get('http://localhost:8080/file000.txt')
+        r = requests.get('http://localhost:8080/file446.txt')
         end = time.time()
         if  r.status_code == 200:
             tests += 1
@@ -110,22 +110,29 @@ def performance_evaluation(mu_l, mu_m):
     # You convert your mu into a certain number of clients per second. Then you vary from 10% to 95% or 98%.
 
     utilization = [0.01, 0.05, 0.10, 0.25, 0.50, 0.75, 0.90, 0.95, 0.98, 0.99]
-    loadsm = [] # could also do loadsm = map(lambda x: x * mu_m, lambdasperc)
-    loadsl = [] # could also do loadsl = map(lambda x: x * mu_l, lambdasperc)
+    loadsm = map(lambda x: x * mu_m, utilization)
+    loadsl = map(lambda x: x * mu_l, utilization)
+    print 'Loadsm: '
+    print loadsm
+    print '\n'
+    print 'Loadsl: '
+    print loadsl
+    print '\n'
 
-    for percent in utilization:
-        load = percent * mu_m # lambda
-        loadsm.append(load)
+    for load in loadsm:
         os.system('python ../lab4-webserver/tests/generator.py --port 8080 -l %d -d 30 >> ./part3/ours/web-ours-%d.txt' % (load, load))
-    for percent in utilization:
-        load = percent * mu_l
-        loadsl.append(load)
+    for load in loadsl:
         os.system('python ../lab4-webserver/tests/generator.py --port 3000 -l %d -d 30 >> ./part3/lighttpd/web-lighttpd-%d.txt' % (load, load)) 
 
-    #	loadsm = [3, 16, 32, 80, 161, 241, 290, 306, 315, 319] # For debugging, not having to run many files again
     # Our Web Server
-    avg_ours_times = {}
+    # Saved the results so not necessary to do generator stuff again:
+    # mu_m = 264.576617
+    # mu_l = 311.317585
+    # loadsm = [2.645766166295231, 13.228830831476154, 26.457661662952308, 66.14415415738077, 132.28830831476154, 198.4324624721423, 238.11895496657078, 251.3477857980469, 259.2850842969326, 261.93085046322784]
+    # loadsl = [3.1131758549665065, 15.565879274832533, 31.131758549665065, 77.82939637416266, 155.6587927483253, 233.48818912248797, 280.18582694698557, 295.7517062218181, 305.0912337867176, 308.2044096416841]
+
     all_our_times = {}  # map from load number to a list of times
+    avg_our_times = {}
     for l in loadsm:
         f = open('./part3/ours/web-ours-%d.txt' % (l))
         total_time = 0
@@ -134,35 +141,53 @@ def performance_evaluation(mu_l, mu_m):
         for line in f:
             total_lines += 1
             time = float(line.split()[5])
-            all_times.append(time)
             total_time += time
+            all_times.append(time)
+        avg_our_times[l] = total_time/total_lines
         all_our_times[l] = all_times
-    
-        avg_ours_times[l] = total_time/total_lines
-        print 'Average for ours load %d: %f' % (l, avg_ours_times[l])	# unneeded, but for my information
 
-    """ Create a box plot of the download time"""
     clf()
     boxplot(all_our_times.values(),positions=utilization,widths=0.01)
+    lambdaa = np.arange(0,mu_m,1.0)
+    plot(lambdaa/mu_m,1/(mu_m - lambdaa))
+    title('Real Average Response Time vs Utilization for Our Server\n')
+    xlabel('Utilization')
+    ylabel('Average Response Time')
     xlim(0,1)
-    # TODO graph theoretical line with this plot of boxplots
-    # ylim(0,1)
-    # plot(np.arange(0,mu_m,1.0)/mu_m,1/(mu_m-np.arange(0,mu_m,1.0)))
-    # xlabel('Utilization')
-    # ylabel('Average Response Time')
-    savefig('download-boxplot%d.png' % (l))
+    savefig('boxplot-our-server.png')
 
-    # TODO Lighttpd Web Server
-    # avg_lighttpd_times = {}
-    # for l in loadsl:
-    #     f = open('./part3/lighttpd/web-lighttpd-%d.txt' % (l))
-    #     total_time = 0
-    #     total_lines = 0
-    #     for line in f:
-    #         total_lines += 1
-    #         total_time += float(line.split()[5])
-    #     avg_lighttpd_times[l] = total_time/total_lines
-    #     print 'Average for lighttpd load %d: %f' % (l, avg_lighttpd_times[l])
+    # plot(utilization, avg_our_times.values())
+    # savefig('avgour.png')
+
+
+    # Lighttpd Web Server
+    all_lighttpd_times = {}  # map from load number to a list of times
+    avg_lighttpd_times = {}
+    for l in loadsl:
+        f = open('./part3/lighttpd/web-lighttpd-%d.txt' % (l))
+        total_time = 0
+        total_lines = 0
+        all_times = []
+        for line in f:
+            total_lines += 1
+            time = float(line.split()[5])
+            total_time += time
+            all_times.append(time)
+        avg_lighttpd_times[l] = total_time/total_lines
+        all_lighttpd_times[l] = all_times
+
+    clf()
+    boxplot(all_lighttpd_times.values(),positions=utilization,widths=0.01)
+    lambdaa = np.arange(0,mu_l,1.0)
+    plot(lambdaa/mu_l,1/(mu_l - lambdaa))
+    title('Real Average Response Time vs Utilization for the Lighttpd Server\n')
+    xlabel('Utilization')
+    ylabel('Average Response Time')
+    xlim(0,1)
+    savefig('boxplot-lighttpd-server.png')
+
+    # plot(utilization, avg_lighttpd_times.values())
+    # savefig('avglight.png')
     
 
 def main():
